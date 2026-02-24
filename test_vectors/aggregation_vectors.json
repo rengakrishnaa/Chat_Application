@@ -1,0 +1,51 @@
+{
+  "description": "Level aggregation B_\u2113 = XOR of tildeK at each level",
+  "levels": [
+    {
+      "level": 0,
+      "families": [
+        "Kyber512",
+        "Saber"
+      ],
+      "node_contributions_hex": [
+        "759c26e0964b3c9acabb10c6bdbb60912397efbe42b76e8dc5baa3d9d0e83455",
+        "17fd3400ff46772dedc14a8c27a133993c1f388fc3ebeecab00f1b20b28f5796",
+        "20644d28c40745f0272b0427b0a3a7b1a39870f052471718a7f934f93f579f03",
+        "809253d5e7372bda844c69fecd6f0f5510cdb4d55d71c253051ac3eaac1ced43"
+      ],
+      "B_level_hex": {
+        "Kyber512": "c2970c1d4a3d259d841d3793e7d6fbecacdd13148e6a550cd7564feaf12c1183",
+        "Saber": "c2970c1d4a3d259d841d3793e7d6fbecacdd13148e6a550cd7564feaf12c1183"
+      }
+    },
+    {
+      "level": 1,
+      "families": [
+        "Kyber512",
+        "Saber"
+      ],
+      "node_contributions_hex": [
+        "edb41b4f80613700a99ae8dc43dcfd56217ba7602acfe51bf62500e11e106ceb",
+        "d978aa979185f79c37f70519803b9ea785927122963646b0c1421a0f6201ea2d"
+      ],
+      "B_level_hex": {
+        "Kyber512": "34ccb1d811e4c09c9e6dedc5c3e763f1a4e9d642bcf9a3ab37671aee7c1186c6",
+        "Saber": "34ccb1d811e4c09c9e6dedc5c3e763f1a4e9d642bcf9a3ab37671aee7c1186c6"
+      }
+    },
+    {
+      "level": 2,
+      "families": [
+        "Kyber512",
+        "Saber"
+      ],
+      "node_contributions_hex": [
+        "877e1e8090c91f05de92efb03c9f735d2c69fdad4596f88ed0431c16f58fca5f"
+      ],
+      "B_level_hex": {
+        "Kyber512": "877e1e8090c91f05de92efb03c9f735d2c69fdad4596f88ed0431c16f58fca5f",
+        "Saber": "877e1e8090c91f05de92efb03c9f735d2c69fdad4596f88ed0431c16f58fca5f"
+      }
+    }
+  ]
+}

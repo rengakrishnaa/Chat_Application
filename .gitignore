@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local / secrets (do not commit)
+.env
+*.local
+config_local.py
+
+# DB (optional: uncomment if DB file is local)
+# *.db
+# *.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db

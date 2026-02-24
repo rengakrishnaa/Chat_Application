@@ -1,0 +1,22 @@
+{
+  "description": "Tree structure: adjacency list for 7-node session (admin -> mods -> mems)",
+  "n_nodes": 7,
+  "adjacency": {
+    "admin": [
+      "mod1",
+      "mod2"
+    ],
+    "mod1": [
+      "mod1-mem1",
+      "mod1-mem2"
+    ],
+    "mod2": [
+      "mod2-mem1",
+      "mod2-mem2"
+    ],
+    "mod1-mem1": [],
+    "mod1-mem2": [],
+    "mod2-mem1": [],
+    "mod2-mem2": []
+  }
+}

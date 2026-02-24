@@ -1,0 +1,30 @@
+{
+  "description": "Performance validation: latency breakdown (n=7) per paper Section VII-H, bandwidth",
+  "latency_breakdown_n7_ms": {
+    "Downlink": 18.2,
+    "Uplink": 22.1,
+    "Phase4_commit_ms": 18,
+    "Phase4_barrier_ms": 15,
+    "Phase4_reveal_ms": 9,
+    "Phase4_total_ms": 42,
+    "Reveal_Aggregate": 31.7,
+    "Total": 120
+  },
+  "bandwidth_n7_bytes": 11343,
+  "bandwidth_n7_kb": 11.08,
+  "paper_bandwidth_n7_kb": 11.14,
+  "paper_bandwidth_kb": {
+    "7": 11.14,
+    "13": 21.63,
+    "31": 53.13,
+    "64": 110.93
+  },
+  "paper_latency_ms": {
+    "8": 13.4,
+    "16": 15.2,
+    "32": 19.7,
+    "64": 29.3,
+    "128": 48.0
+  },
+  "note": "Total 120 ms and Phase 4 (18+15+9=42 ms) from paper. Bandwidth from this run; paper 11.14 KB at n=7. 4.8x bandwidth savings at n=64 per paper; 114 ms sometimes cited."
+}

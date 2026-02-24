@@ -1,0 +1,85 @@
+{
+  "description": "Cryptographic primitive test vectors per family",
+  "families": [
+    "Kyber512",
+    "Saber"
+  ],
+  "long_term_keys": [
+    {
+      "family": "Kyber512",
+      "node_id": "admin",
+      "pk_hex": "e701b57f869d2aaae1e4461da8a8b724cda3548424a7027f2855701f070916b0",
+      "sk_hex": "e701b57f869d2aaae1e4461da8a8b724cda3548424a7027f2855701f070916b0"
+    },
+    {
+      "family": "Saber",
+      "node_id": "admin",
+      "pk_hex": "16514a04db1275f7fe7a336ee6449f30d888b3628cfb8e1592ffbd3c50bd332c",
+      "sk_hex": "16514a04db1275f7fe7a336ee6449f30d888b3628cfb8e1592ffbd3c50bd332c"
+    },
+    {
+      "family": "Kyber512",
+      "node_id": "mod1",
+      "pk_hex": "498ec3343ea5c3260c769fd87afdfc1827e4936108151b05bc8e57a9ed557344",
+      "sk_hex": "498ec3343ea5c3260c769fd87afdfc1827e4936108151b05bc8e57a9ed557344"
+    },
+    {
+      "family": "Saber",
+      "node_id": "mod1",
+      "pk_hex": "5087d30d1865b70e336c98a38cf7ed3a59afae8fde6fa7d13ccd5b824ee9e333",
+      "sk_hex": "5087d30d1865b70e336c98a38cf7ed3a59afae8fde6fa7d13ccd5b824ee9e333"
+    },
+    {
+      "family": "Kyber512",
+      "node_id": "mod1-mem1",
+      "pk_hex": "ed32e2b897eb89bb3e1994b6a9d60cf22e441f1a08187008cc97f842d0d83d18",
+      "sk_hex": "ed32e2b897eb89bb3e1994b6a9d60cf22e441f1a08187008cc97f842d0d83d18"
+    },
+    {
+      "family": "Saber",
+      "node_id": "mod1-mem1",
+      "pk_hex": "75113e7329be6d0e000facb6eadd6e39e7bc45d5fb7739e7371fec8a775672db",
+      "sk_hex": "75113e7329be6d0e000facb6eadd6e39e7bc45d5fb7739e7371fec8a775672db"
+    }
+  ],
+  "mkem_downlink": [
+    {
+      "family": "Kyber512",
+      "parent_id": "mod1",
+      "children_ids": [
+        "mod1-mem1"
+      ],
+      "ciphertext_hex": "c8979b05f13f70a20beef3bf8a9fca27c2acdbbf20bb4bcf93be1971e6b550c4",
+      "shared_secret_hex": "1724b45e762861a54248ea52120faf44b7213744b51dbe32a4c1cac8100528c5",
+      "nonce_hex": "11b57c5bf0398a89bbc9d98b"
+    },
+    {
+      "family": "Saber",
+      "parent_id": "mod1",
+      "children_ids": [
+        "mod1-mem1"
+      ],
+      "ciphertext_hex": "a3fa516063cae3f9c490eb3aee303bd7da83cecf59d72d02a07fa1753c236a77",
+      "shared_secret_hex": "2bc098998a9c38d4603effcb19c6508739fe261cd1476ee159f8e1b1ec3fb388",
+      "nonce_hex": "c0e7c8e625f9daaefbb0253f"
+    }
+  ],
+  "uplink_kem": [
+    {
+      "family": "Kyber512",
+      "child_id": "mod1-mem1",
+      "parent_id": "mod1",
+      "ciphertext_hex": "559645e24253793634d16cbc0f107ac20a97eefb5a505e360b0578e3d7402b50",
+      "shared_secret_hex": "e4a429e5d6908de172a1d9e4bbd60ccef576aaa1d7827e81b291739ac0a92396",
+      "nonce_hex": "3a540c9d6be71af157c6acb6"
+    },
+    {
+      "family": "Saber",
+      "child_id": "mod1-mem1",
+      "parent_id": "mod1",
+      "ciphertext_hex": "bfb06998fe54cd02626f61cb811d37e4b52b42d8ef615eefea94ec8bfbde51ef",
+      "shared_secret_hex": "da5ca559895bcbbd432fa8fb198717c2886edb32c4c3ee1608f4abf9d2787dcc",
+      "nonce_hex": "fd327f172f7b23c55b1cd584"
+    }
+  ]
+}

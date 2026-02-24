@@ -1,0 +1,42 @@
+{
+  "description": "Key confirmation tags per participant",
+  "K_final_hex": "fcda29bbaa05ae8b83780650e10efe27909a48f63de314dbe482dc9448d5a8b1",
+  "sid_hex": "72f312c0059680d9a1cfaf67f4e24101a849840f2c9e890d6de38ad72a206555",
+  "tags": [
+    {
+      "node_id": "admin",
+      "confirmation_tag_hex": "82bcee6e1320e2d93972a95f77517548f571cb1d4a7b57f491fa77da8bb4d080",
+      "verified": true
+    },
+    {
+      "node_id": "mod1",
+      "confirmation_tag_hex": "ceffb59f2c4fdaa4eb40dbb959eda09b6cb2a275f1e99733e4483bb23b0502cf",
+      "verified": true
+    },
+    {
+      "node_id": "mod1-mem1",
+      "confirmation_tag_hex": "164f53a330fd1785eb3c5e6ada89179cb7c6d9bd2ccaee0a659b25cfedcced9a",
+      "verified": true
+    },
+    {
+      "node_id": "mod1-mem2",
+      "confirmation_tag_hex": "25aef9fcae2849d1b05a5c7c3fa664fd54df0b54cfb5cd808567a6d15977c7c1",
+      "verified": true
+    },
+    {
+      "node_id": "mod2",
+      "confirmation_tag_hex": "b69659f5b7926825de68bd05ab4b79338e97584f5d51d54ec7b520ec7b4b0c0a",
+      "verified": true
+    },
+    {
+      "node_id": "mod2-mem1",
+      "confirmation_tag_hex": "fdf1140322ae9946012417dba658999ce32c3d202d06993d4c0f61f5a9ecee76",
+      "verified": true
+    },
+    {
+      "node_id": "mod2-mem2",
+      "confirmation_tag_hex": "0e47518144e751a1e92717a8285cc79bf24be598588de6bdd2051effa7ad7bfd",
+      "verified": true
+    }
+  ]
+}

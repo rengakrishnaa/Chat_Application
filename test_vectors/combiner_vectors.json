@@ -1,0 +1,19 @@
+{
+  "K_grp": {
+    "Kyber512": "8111a30607443012f11d9be5e65b86feebb07c8b3fb7cbb4a59bfb14ca386c7d",
+    "Saber": "482b5016552413196cfe2b579f4e67cf7ef2e6e2a489b3a9460e7a84de331057"
+  },
+  "salt1_hex": "04ce8e70feb62f470e7270e81a24756f3be171871d9db234319792e037f2a87d",
+  "salt2_hex": "65f76fd690e3cf52630654cf0cd0db95568f425e4f2861212c41d76b02539437",
+  "k_j": {
+    "Kyber512": "5192055cda69d06b52bcf8ca92db8151115b8da37ba01a2aae36d914edfd9780",
+    "Saber": "0d678091569f666e129ff9065bb77aef87996bd298f6bc28b74dd74e98af2450"
+  },
+  "u_j": {
+    "Kyber512": "e7bd36d331c8db2c94a1815ed3dc332adbefe8da37e3562f46baa8d2c9dd4b165394dcb8298f252f48b37b0c8e79b9a30dc2801f8486392541947e8cc442ceba",
+    "Saber": "34198d0caca593a0819fbf30abf16947e8be0d6ec7867ced36e192ea78b6e6faadb70a381f6c8f5c7632033bc9550b8c87a07d053d49dff0cc94e23aaf88ebe6"
+  },
+  "intermediate_t_hex": "a4ca16f41d0704db5a4fa91de88bab6d07cf289cbdc946563f9986b1ab9a3b6c",
+  "K_final_hex": "fcda29bbaa05ae8b83780650e10efe27909a48f63de314dbe482dc9448d5a8b1",
+  "description": "Split-key PRF combiner: at-least-one security, domain separation, cross-wiring"
+}
