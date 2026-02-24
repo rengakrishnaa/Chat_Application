@@ -1,6 +1,6 @@
 # VeriTree-GAKE Test Vectors
 
-This folder contains test vectors that allow **independent verification** of protocol behavior and cryptographic artifacts.
+This folder contains test vectors that allow **independent verification** of protocol behavior and cryptographic artifacts. The protocol implementation and experiments live in the **[Veri_Tree](https://github.com/rengakrishnaa/Veri_Tree)** repository.
 
 **Checklist:** See **TEST_VECTOR_CHECKLIST.md** for a line-by-line mapping of requirements (core transcripts, cryptographic artifacts, verification vectors, performance, implementation validation) to files and scripts.
 

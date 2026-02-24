@@ -2,6 +2,8 @@
 
 Secure group chat application built on **VeriTree-GAKE** (Verifiable Tree Group Authenticated Key Exchange), a post-quantum group key exchange protocol with multi-recipient KEM distribution and split-key hybridization.
 
+**Protocol implementation:** The VeriTree-GAKE protocol code, experiments, and core library live in a separate repository. To view or contribute to the protocol itself, see **[Veri_Tree](https://github.com/rengakrishnaa/Veri_Tree)**. This app depends on it via `veritree-gake` (see `requirements.txt`).
+
 ## Contents
 
 - **Application code** — FastAPI + WebSockets chat app using VeriTree-GAKE for group key establishment (`app.py`, `config.py`, `models.py`, `crud.py`, `database.py`, `email_service.py`, etc.).
@@ -10,7 +12,7 @@ Secure group chat application built on **VeriTree-GAKE** (Verifiable Tree Group 
 
 ## Quick start
 
-1. **Install dependencies**
+1. **Install dependencies** (includes the VeriTree-GAKE library from [Veri_Tree](https://github.com/rengakrishnaa/Veri_Tree))
    ```bash
    pip install -r requirements.txt
    ```
