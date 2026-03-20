@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr
 from typing import List, Dict, Any, Set, Optional
@@ -19,9 +19,11 @@ from crud import (
     get_membership_by_token,
     list_group_members,
     get_active_member_names,
+    is_accepted_member_of_group,
 )
 from email_service import send_invite_email
 from config import APP_BASE_URL
+from database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,8 @@ class AddMemberRequest(BaseModel):
     role: str = "member"
 
 class RemoveMemberRequest(BaseModel):
-    username: str
+    username: str  # user to remove
+    removed_by: str  # username of the person performing the removal (must be higher in hierarchy)
 
 class EncryptRequest(BaseModel):
     group_id: int
@@ -65,7 +68,9 @@ class RekeyRequest(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _rebuild_tree_and_session(db: Session, group: Group) -> dict:
-    """Rebuild the VeriTree for current members and refresh the crypto session."""
+    """Rebuild the VeriTree for current members and refresh the crypto session (rekey).
+    Per VeriTree-GAKE: after add/remove member we recompute the tree and derive a new
+    group key so excluded members cannot derive future keys (forward secrecy)."""
     admin_name, moderators, members = get_active_member_names(db, group.id)
 
     moderators_for_tree = [
@@ -155,11 +160,20 @@ def create_group(req: GroupCreateRequest, db: Session = Depends(get_db)):
     db.refresh(group)
 
     invites_to_send: list[tuple[str, str, str]] = []
+    invite_links: list[dict] = []
 
     def _add_entries(entries: List[MemberEntry], role: GroupRole):
         for entry in entries:
             user = get_or_create_user(db, entry.username, entry.email)
             m = add_membership(db, user, group, role)
+            if m.invite_token:
+                join_url = f"{APP_BASE_URL}/join/{m.invite_token}"
+                invite_links.append({
+                    "username": entry.username,
+                    "email": entry.email or None,
+                    "role": role.value,
+                    "join_link": join_url,
+                })
             if entry.email and m.invite_token:
                 invites_to_send.append((entry.email, m.invite_token, role.value))
 
@@ -176,8 +190,10 @@ def create_group(req: GroupCreateRequest, db: Session = Depends(get_db)):
     tree_result = _rebuild_tree_and_session(db, group)
     db.commit()
 
+    emails_sent = 0
     for email, token, role in invites_to_send:
-        send_invite_email(email, group.name, token, role)
+        if send_invite_email(email, group.name, token, role):
+            emails_sent += 1
 
     return {
         "group_id": group.id,
@@ -187,6 +203,8 @@ def create_group(req: GroupCreateRequest, db: Session = Depends(get_db)):
             "bandwidth_bytes": tree_result.get("bandwidth_bytes", 0),
             "unanimous": tree_result.get("unanimous", True),
         },
+        "invite_links": invite_links,
+        "emails_sent": emails_sent,
     }
 
 
@@ -217,16 +235,21 @@ def api_add_member(
     tree_result = _rebuild_tree_and_session(db, group)
     db.commit()
 
+    email_sent = False
     if req.email and m.invite_token:
-        send_invite_email(req.email, group.name, m.invite_token, role.value)
+        email_sent = send_invite_email(req.email, group.name, m.invite_token, role.value)
 
+    join_link = f"{APP_BASE_URL}/join/{m.invite_token}" if m.invite_token else None
+    tree_row = db.query(GroupTree).filter_by(group_id=group_id).first()
     return {
         "status": "added",
         "username": req.username,
         "role": role.value,
         "invite_token": m.invite_token,
+        "join_link": join_link,
+        "email_sent": email_sent,
         "tree_id": tree_result.get("tree_id"),
-        "epoch": db.query(GroupTree).filter_by(group_id=group_id).first().epoch,
+        "epoch": tree_row.epoch if tree_row else None,
     }
 
 
@@ -243,7 +266,7 @@ def api_remove_member(
         raise HTTPException(status_code=404, detail="Group not found")
 
     try:
-        removed = remove_membership(db, group_id, req.username)
+        removed = remove_membership(db, group_id, req.username, removed_by_username=req.removed_by)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -298,10 +321,15 @@ def rekey_group(group_id: int, req: RekeyRequest, db: Session = Depends(get_db))
 # ── API: encrypt ──────────────────────────────────────────────────────────────
 
 @app.post("/api/encrypt")
-def api_encrypt(req: EncryptRequest):
+def api_encrypt(req: EncryptRequest, db: Session = Depends(get_db)):
     session = chat_sessions.get(req.group_id)
     if not session:
         raise HTTPException(status_code=404, detail="Group session not active")
+    if not is_accepted_member_of_group(db, req.group_id, req.user):
+        raise HTTPException(
+            status_code=403,
+            detail="You must be an accepted member of this group to send messages. Use the invite link to join.",
+        )
 
     encrypted = session.encrypt_message(req.message.encode(), req.user).hex()
     return {
@@ -315,7 +343,31 @@ def api_encrypt(req: EncryptRequest):
 # ── WebSocket broadcast ──────────────────────────────────────────────────────
 
 @app.websocket("/ws/{group_id}")
-async def ws_chat(websocket: WebSocket, group_id: int):
+async def ws_chat(
+    websocket: WebSocket,
+    group_id: int,
+    username: str = Query(..., description="Your username; must be an accepted member of the group"),
+):
+    """Connect to group chat. Requires query param 'username'; user must be an accepted member of the group."""
+    if not username or not username.strip():
+        await websocket.close(code=4400, reason="Missing username. Use ?username=YourName")
+        return
+    username = username.strip()
+    db = SessionLocal()
+    try:
+        group = db.query(Group).filter_by(id=group_id).first()
+        if not group:
+            await websocket.close(code=4404, reason="Group not found")
+            return
+        if not is_accepted_member_of_group(db, group_id, username):
+            await websocket.close(
+                code=4403,
+                reason="Not a member of this group. Accept the invite link sent to your email first.",
+            )
+            return
+    finally:
+        db.close()
+
     await websocket.accept()
     if group_id not in clients:
         clients[group_id] = set()
@@ -353,7 +405,8 @@ def _render_join_page(group_name: str, group_id: int, username: str, already: bo
       <p>{status}</p>
       <p><strong>Group:</strong> {group_name}</p>
       <p><strong>Username:</strong> {username}</p>
-      <a href="/" class="btn" style="display:inline-block; margin-top:16px; text-decoration:none;">
+      <p style="font-size:12px; color:var(--text-muted); margin-top:12px;">You can now chat from this or any device. Use the button below to open the chat (your username and group are pre-filled).</p>
+      <a href="/?group_id={group_id}&username={username}" class="btn" style="display:inline-block; margin-top:16px; text-decoration:none;">
         Open Chat
       </a>
     </div>
@@ -410,6 +463,7 @@ input[type="text"], input[type="email"], select {
   transition: border-color 0.2s;
 }
 input:focus, select:focus { border-color: var(--primary); }
+input[readonly] { opacity: 0.9; cursor: not-allowed; }
 .btn {
   padding: 10px 20px; border: none; border-radius: 6px;
   font-size: 14px; font-weight: 600; cursor: pointer;
@@ -544,6 +598,11 @@ def _render_main_page() -> str:
         <button class="btn" onclick="createGroup()" id="create-btn">Create Group &amp; Run Protocol</button>
       </div>
       <div class="status" id="create-status"></div>
+      <div id="invite-links-wrap" class="hidden" style="margin-top:16px; padding:12px; background:var(--surface2); border-radius:8px; border:1px solid var(--border);">
+        <h4 style="font-size:13px; margin-bottom:8px; color:var(--success);">Invite links — share with members (e.g. by email or chat)</h4>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">Configure SMTP in .env or config to send these links by email. Until then, copy and share each link below.</p>
+        <ul id="invite-links-list" style="list-style:none; font-size:12px;"></ul>
+      </div>
     </div>
   </div>
 
@@ -551,11 +610,16 @@ def _render_main_page() -> str:
   <div id="tab-manage" class="hidden">
     <div class="card">
       <h2>Manage Group Members</h2>
-
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Removal follows hierarchy: only owner/admin can remove admins; only owner/admin/moderator can remove moderators; only higher roles can remove members.</p>
+      <p id="manage-invite-lock-note" class="hidden" style="font-size:12px; color:var(--success); margin-bottom:8px;">Opened via invite link: Group ID and your username are locked.</p>
       <div class="row">
         <div>
-          <label>Group ID</label>
+          <label>Group ID <span id="manage-gid-lock-hint" class="hidden" style="color:var(--success); font-weight:normal;">(locked)</span></label>
           <input type="text" id="manage-gid" placeholder="e.g. 1"/>
+        </div>
+        <div>
+          <label>Your username (authorizes remove) <span id="manage-actor-lock-hint" class="hidden" style="color:var(--success); font-weight:normal;">(locked)</span></label>
+          <input type="text" id="manage-actor" placeholder="e.g. admin"/>
         </div>
         <div style="display:flex; align-items:flex-end;">
           <button class="btn" onclick="loadMembers()">Load Members</button>
@@ -609,14 +673,15 @@ def _render_main_page() -> str:
   <div id="tab-chat" class="hidden">
     <div class="card">
       <h2>Encrypted Group Chat</h2>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Only <strong>accepted</strong> group members can connect. Use the exact username from your invite; accept the join link (e.g. from email) first if you haven&apos;t yet.</p>
       <div class="row" style="margin-bottom:12px;">
         <div>
-          <label>Group ID</label>
+          <label>Group ID <span id="chat-gid-lock-hint" class="hidden" style="color:var(--success); font-weight:normal;">(locked from invite link)</span></label>
           <input type="text" id="chat-gid" placeholder="e.g. 1"/>
         </div>
         <div>
-          <label>Your Username</label>
-          <input type="text" id="chat-user" placeholder="e.g. alice"/>
+          <label>Your Username <span id="chat-user-lock-hint" class="hidden" style="color:var(--success); font-weight:normal;">(locked from invite link)</span></label>
+          <input type="text" id="chat-user" placeholder="e.g. alice" autocomplete="username"/>
         </div>
         <div style="display:flex; align-items:flex-end;">
           <button class="btn" onclick="connectChat()">Connect</button>
@@ -647,6 +712,10 @@ function toast(msg) {{
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
+}}
+function copyInviteLink(btn) {{
+  const link = btn.getAttribute('data-link');
+  if (link) {{ navigator.clipboard.writeText(link); toast('Link copied'); }}
 }}
 
 function switchTab(name) {{
@@ -686,6 +755,31 @@ addMemberRow('admin-list');
 addMemberRow('mod-list');
 addMemberRow('member-list');
 
+/* When opened via invite link (?group_id=1&username=alice): lock Group ID and username everywhere so they cannot be changed */
+(function() {{
+  const params = new URLSearchParams(location.search);
+  const gid = params.get('group_id');
+  const un = params.get('username');
+  const fromInviteLink = !!(gid && un);
+  if (fromInviteLink) {{
+    const lock = (id, value, hintId) => {{
+      const el = $(id);
+      if (el) {{ el.value = value; el.readOnly = true; el.setAttribute('readonly', 'readonly'); }}
+      const h = hintId && $(hintId);
+      if (h) h.classList.remove('hidden');
+    }};
+    lock('chat-gid', gid, 'chat-gid-lock-hint');
+    lock('chat-user', un, 'chat-user-lock-hint');
+    lock('manage-gid', gid, 'manage-gid-lock-hint');
+    lock('manage-actor', un, 'manage-actor-lock-hint');
+    const note = $('manage-invite-lock-note');
+    if (note) note.classList.remove('hidden');
+    switchTab('chat');
+  }} else if (gid) {{
+    $('chat-gid').value = gid;
+  }}
+}})();
+
 /* ── create group ── */
 let currentGroupId = null;
 
@@ -718,10 +812,26 @@ async function createGroup() {{
 
     $('create-status').textContent =
       `Group created (ID: ${{data.group_id}}) | Tree: ${{data.tree.tree_id}} | BW: ${{data.tree.bandwidth_bytes}} B | Unanimous: ${{data.tree.unanimous}}`;
+    if (data.emails_sent > 0) $('create-status').textContent += ` | ${{data.emails_sent}} invite email(s) sent.`;
 
     $('chat-gid').value = data.group_id;
     $('manage-gid').value = data.group_id;
-    toast('Group created! Invitation emails queued.');
+
+    const wrap = $('invite-links-wrap');
+    const list = $('invite-links-list');
+    if (data.invite_links && data.invite_links.length > 0) {{
+      wrap.classList.remove('hidden');
+      list.innerHTML = '';
+      data.invite_links.forEach(inv => {{
+        const li = document.createElement('li');
+        li.style.marginBottom = '8px';
+        li.innerHTML = `<strong>${{inv.username}}</strong>${{inv.email ? ' (' + inv.email + ')' : ''}} — <a href="${{inv.join_link}}" target="_blank" rel="noopener" style="color:var(--primary); word-break:break-all;">${{inv.join_link}}</a> <button class="btn btn-sm" style="margin-left:6px;" onclick="copyInviteLink(this)" data-link="${{inv.join_link.replace(/"/g, '&quot;')}}">Copy</button>`;
+        list.appendChild(li);
+      }});
+      toast('Group created! Share the invite links above (or check email if SMTP is configured).');
+    }} else {{
+      toast('Group created!');
+    }}
   }} catch (e) {{
     $('create-status').textContent = 'Error: ' + e;
   }} finally {{
@@ -785,7 +895,16 @@ async function addMember() {{
     }});
     if (!res.ok) {{ $('add-status').textContent = 'Error: ' + (await res.text()); return; }}
     const data = await res.json();
-    $('add-status').textContent = `Added ${{username}} (epoch ${{data.epoch}}). Invite sent.`;
+    let status = `Added ${{username}} (epoch ${{data.epoch}}).`;
+    if (data.email_sent) status += ' Invite email sent.';
+    else if (data.join_link) status += ' Share the join link below (configure SMTP in config to send by email).';
+    $('add-status').innerHTML = status + (data.join_link ? ' <button class="btn btn-sm" id="add-copy-btn">Copy link</button>' : '');
+    if (data.join_link) {{
+      const link = data.join_link;
+      $('add-status').append(document.createTextNode(' ' + link));
+      const btn = document.getElementById('add-copy-btn');
+      if (btn) btn.onclick = () => {{ navigator.clipboard.writeText(link); toast('Link copied'); }};
+    }}
     toast(`${{username}} added to group. Tree rekeyed.`);
     hideAddPanel();
     loadMembers();
@@ -796,7 +915,9 @@ async function addMember() {{
 
 async function removeMember(username) {{
   const gid = $('manage-gid').value.trim();
+  const removedBy = $('manage-actor').value.trim();
   if (!gid) return;
+  if (!removedBy) {{ $('manage-status').textContent = 'Enter your username to authorize removal.'; return; }}
   if (!confirm(`Remove ${{username}} from the group? This triggers a rekey.`)) return;
 
   $('manage-status').textContent = 'Removing & rekeying...';
@@ -804,7 +925,7 @@ async function removeMember(username) {{
     const res = await fetch(`/groups/${{gid}}/members`, {{
       method: 'DELETE',
       headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{ username }})
+      body: JSON.stringify({{ username, removed_by: removedBy }})
     }});
     if (!res.ok) {{ $('manage-status').textContent = 'Error: ' + (await res.text()); return; }}
     const data = await res.json();
@@ -827,12 +948,19 @@ function connectChat() {{
   if (ws) {{ ws.close(); }}
 
   $('chat-status').textContent = 'Connecting...';
-  ws = new WebSocket(`ws://${{location.host}}/ws/${{gid}}`);
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${{wsProto}}//${{location.host}}/ws/${{gid}}?username=${{encodeURIComponent(user)}}`);
 
   ws.onopen = () => {{
     $('chat-status').textContent = 'Connected to group ' + gid;
     $('chat-connected').classList.remove('hidden');
     currentGroupId = Number(gid);
+  }};
+
+  ws.onclose = (event) => {{
+    $('chat-status').textContent = event.code === 4403
+      ? 'Not a member of this group. Accept the invite link from your email (or the link shared with you) first.'
+      : 'Disconnected.';
   }};
 
   ws.onmessage = (event) => {{
@@ -852,10 +980,6 @@ function connectChat() {{
       }}
       appendMessage(msg.user, msg.plaintext_preview, msg.encrypted);
     }} catch (e) {{}}
-  }};
-
-  ws.onclose = () => {{
-    $('chat-status').textContent = 'Disconnected.';
   }};
 }}
 
@@ -891,7 +1015,11 @@ async function sendMessage() {{
       headers: {{'Content-Type': 'application/json'}},
       body: JSON.stringify({{ group_id: currentGroupId, user, message: msg }})
     }});
-    const data = await res.json();
+    const data = await res.json().catch(() => ({{}}));
+    if (!res.ok) {{
+      toast(data.detail || 'Failed to send');
+      return;
+    }}
     ws.send(JSON.stringify(data));
     $('chat-input').value = '';
   }} catch (e) {{

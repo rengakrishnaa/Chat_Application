@@ -1,7 +1,17 @@
 import os
+from pathlib import Path
+
+# Load .env from project root if present (optional)
+_env_path = Path(__file__).resolve().parent / ".env"
+if _env_path.exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(_env_path)
+    except ImportError:
+        pass
 
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
-APP_PORT = int(os.getenv("APP_PORT", "8001"))
+APP_PORT = int(os.getenv("APP_PORT", "8000"))
 APP_BASE_URL = os.getenv("APP_BASE_URL", f"http://{APP_HOST}:{APP_PORT}")
 
 DATABASE_URL = os.getenv(

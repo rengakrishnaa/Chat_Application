@@ -8,6 +8,7 @@ The VeriTree-GAKE protocol implementation lives in a separate repository: **[Ver
 
 ## Table of contents
 
+- [How to run this project](#how-to-run-this-project)
 - [Quick start](#quick-start)
 - [Project layout](#project-layout)
 - [Configuration](#configuration)
@@ -16,6 +17,101 @@ The VeriTree-GAKE protocol implementation lives in a separate repository: **[Ver
 - [Benchmarks](#benchmarks)
 - [Pushing to GitHub](#pushing-to-github)
 - [License](#license)
+
+---
+
+## How to run this project
+
+### Prerequisites
+
+- **Python 3.9+** (recommended 3.10 or 3.11)
+- **PostgreSQL** installed and running (the app uses it for users, groups, and memberships)
+- **Git** (needed to install `veritree-gake` from GitHub)
+
+### Step 1: Clone / open the project
+
+```bash
+cd d:\Final_Year_Project\Chat_Application\Chat_Application
+```
+
+(Or wherever your project folder is.)
+
+### Step 2: Create a virtual environment (recommended)
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+On Linux/macOS: `source venv/bin/activate`.
+
+### Step 3: Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+This installs FastAPI, SQLAlchemy, the VeriTree-GAKE library from GitHub, and the rest. If installation of `veritree-gake` fails, ensure Git is installed and you have network access to `https://github.com/rengakrishnaa/Veri_Tree`.
+
+### Step 4: Set up PostgreSQL
+
+1. Start PostgreSQL and create a database (if it doesn’t exist):
+
+   ```sql
+   CREATE DATABASE Secure_chat;
+   ```
+
+2. Set the connection string. Either:
+
+   - **Option A — Environment variables** (recommended): create a `.env` file in the project root (or set variables in your shell):
+
+   ```env
+   DATABASE_URL=postgresql+psycopg2://postgres:YOUR_PASSWORD@localhost:5432/Secure_chat
+   APP_HOST=127.0.0.1
+   APP_PORT=8000
+   APP_BASE_URL=http://127.0.0.1:8000
+   ```
+
+   - **Option B — Edit `config.py`**: change the default `DATABASE_URL` to match your PostgreSQL user, password, host, and database name.
+
+### Step 5: Initialize the database
+
+```bash
+python __init__db.py
+```
+
+You should see: `Database tables created / updated.`
+
+### Step 6: Run the application
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+Or run with the port from config (default 8000):
+
+```bash
+python app.py
+```
+
+Then open in a browser: **http://localhost:8000**.
+
+### Step 7: Use the app
+
+- **Create Group** tab: create a group with at least one admin; the protocol runs and the group is created.
+- **Manage Group** tab: enter the Group ID, load members, add/remove members (triggers rekey).
+- **Chat** tab: enter Group ID and your username, click Connect, then send messages.
+
+**Invite links and email:** When you add members (with or without email), the app returns a **join link** for each person. Share that link (e.g. paste in chat or send manually) so they can open it on any device and accept the invite. To **send the link by Gmail** automatically, set `SMTP_USER` and `SMTP_PASSWORD` (and optionally `SMTP_HOST`, `SMTP_PORT`) in `.env` or `config.py`. Set `APP_BASE_URL` to your app’s public URL (e.g. `https://your-domain.com`) so the link in the email works when opened from another device.
+
+### Troubleshooting
+
+| Issue | What to do |
+|-------|------------|
+| `ModuleNotFoundError: No module named 'veritree_gake'` | Run `pip install -r requirements.txt` again; ensure Git is installed. |
+| `connection to server at "localhost" (::1) failed` or `could not connect to server` | Start PostgreSQL and check host/port (default 5432). Verify `DATABASE_URL` in `.env` or `config.py`. |
+| `relation "users" does not exist` | Run `python __init__db.py` to create tables. |
+| Port already in use | Use another port, e.g. `uvicorn app:app --host 0.0.0.0 --port 8002`, and set `APP_PORT=8002` and `APP_BASE_URL=http://127.0.0.1:8002` so invite links are correct. |
 
 ---
 
@@ -41,7 +137,7 @@ The VeriTree-GAKE protocol implementation lives in a separate repository: **[Ver
    uvicorn app:app --host 0.0.0.0 --port 8000
    ```
 
-   Open `http://localhost:8000` in a browser.
+   Open **http://localhost:8000** in a browser.
 
 ---
 
@@ -65,11 +161,13 @@ The VeriTree-GAKE protocol implementation lives in a separate repository: **[Ver
 
 ## Configuration
 
+If you create a `.env` file in the project root, it is loaded automatically (using `python-dotenv`). Otherwise, set environment variables in your shell or edit the defaults in `config.py`.
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+psycopg2://postgres:postgres@localhost:5432/Secure_chat` |
 | `APP_HOST` | Bind host | `127.0.0.1` |
-| `APP_PORT` | Bind port | `8001` |
+| `APP_PORT` | Bind port | `8000` |
 | `APP_BASE_URL` | Base URL for invite links | `http://{APP_HOST}:{APP_PORT}` |
 | `SMTP_HOST`, `SMTP_PORT` | SMTP server | Gmail defaults |
 | `SMTP_USER`, `SMTP_PASSWORD` | SMTP credentials (optional; if unset, invite emails are skipped) |
@@ -81,7 +179,7 @@ The VeriTree-GAKE protocol implementation lives in a separate repository: **[Ver
 
 - **Create group** — Tab “Create Group”: name, admins (at least one), moderators, members. Submitting runs VeriTree-GAKE and creates the group; invitation emails are sent if SMTP is configured.
 - **Manage group** — Tab “Manage Group”: enter Group ID, load members, add/remove members (triggers rekey). Rekey is also available via API.
-- **Chat** — Tab “Chat”: enter Group ID and username, connect. Messages are encrypted via the group session and broadcast over WebSocket.
+- **Chat** — Tab “Chat”: enter Group ID and your **username** (exactly as in the group), then Connect. **Only accepted members** can connect: each member must open the **join link** (from email or shared by you) and accept the invite first. After that they can open the app from any device, enter the same Group ID and username, and chat.
 
 Invitation links use the form `{APP_BASE_URL}/join/{token}`; accepting marks the membership as accepted.
 

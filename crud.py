@@ -58,22 +58,49 @@ def add_membership(
     return membership
 
 
+# Hierarchy for removal: only a strictly higher role can remove a lower one (owner > admin > moderator > member).
+_ROLE_ORDER = {GroupRole.owner: 0, GroupRole.admin: 1, GroupRole.moderator: 2, GroupRole.member: 3}
+
+
 def remove_membership(
     db: Session,
     group_id: int,
     username: str,
+    removed_by_username: Optional[str] = None,
 ) -> bool:
-    membership = (
+    """Remove a member from the group. If removed_by_username is set, enforces hierarchy: only higher roles can remove lower (owner > admin > moderator > member)."""
+    target = (
         db.query(GroupMembership)
         .join(User, GroupMembership.user_id == User.id)
         .filter(GroupMembership.group_id == group_id, User.username == username)
         .first()
     )
-    if not membership:
+    if not target:
         return False
-    if membership.role == GroupRole.owner:
+    if target.role == GroupRole.owner:
         raise PermissionError("Cannot remove the group owner")
-    db.delete(membership)
+
+    if removed_by_username is not None:
+        remover = (
+            db.query(GroupMembership)
+            .join(User, GroupMembership.user_id == User.id)
+            .filter(
+                GroupMembership.group_id == group_id,
+                User.username == removed_by_username,
+            )
+            .first()
+        )
+        if not remover:
+            raise PermissionError("You are not a member of this group")
+        remover_order = _ROLE_ORDER.get(remover.role, 99)
+        target_order = _ROLE_ORDER.get(target.role, 99)
+        if remover_order >= target_order:
+            raise PermissionError(
+                "Only a higher role can remove a lower one. Hierarchy: owner > admin > moderator > member. "
+                "Members cannot remove moderators; moderators cannot remove admins."
+            )
+
+    db.delete(target)
     db.flush()
     return True
 
@@ -159,3 +186,21 @@ def require_admin_or_owner(
     )
     if not m or m.role not in {GroupRole.admin, GroupRole.owner}:
         raise PermissionError("Admin or owner role required")
+
+
+def is_accepted_member_of_group(
+    db: Session,
+    group_id: int,
+    username: str,
+) -> bool:
+    """Return True if the user is a member of the group and has accepted the invite (required for chat)."""
+    m = (
+        db.query(GroupMembership)
+        .join(User, GroupMembership.user_id == User.id)
+        .filter(
+            GroupMembership.group_id == group_id,
+            User.username == username,
+        )
+        .first()
+    )
+    return m is not None and m.accepted
